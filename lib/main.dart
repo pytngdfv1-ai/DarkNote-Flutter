@@ -16,19 +16,17 @@ class DarkNoteApp extends StatelessWidget {
       theme: ThemeData(
         brightness: Brightness.dark,
         primarySwatch: Colors.blueGrey,
-        scaffoldBackgroundColor: const Color(0xFF1E1E1E), // Color típico de editores oscuros
+        scaffoldBackgroundColor: const Color(0xFF1E1E1E),
         appBarTheme: const AppBarTheme(
           backgroundColor: Color(0xFF2D2D2D),
           foregroundColor: Colors.white,
           elevation: 1,
         ),
         bottomAppBarTheme: const BottomAppBarTheme(
-          color: Color(0xFF007ACC), // Azul típico de barra de estado VS Code
-          foregroundColor: Colors.white,
+          color: Color(0xFF007ACC),
         ),
         popupMenuTheme: const PopupMenuThemeData(
           color: Color(0xFF252526),
-          textColor: Colors.white,
         ),
       ),
       home: const EditorScreen(),
@@ -49,7 +47,6 @@ class _EditorScreenState extends State<EditorScreen> {
   int _currentColumn = 1;
   int _totalLines = 1;
   
-  // Estado simulado para la barra de estado
   bool _wordWrap = false;
   String _encoding = 'UTF-8';
   double _zoomLevel = 1.0;
@@ -94,7 +91,6 @@ class _EditorScreenState extends State<EditorScreen> {
       appBar: AppBar(
         title: const Text('DarkNote - Sin título'),
         actions: [
-          // Menú Archivo
           PopupMenuButton<String>(
             icon: const Icon(Icons.menu_book),
             tooltip: 'Archivo',
@@ -109,7 +105,6 @@ class _EditorScreenState extends State<EditorScreen> {
               const PopupMenuItem(value: 'solo_lectura', child: Text('Solo lectura')),
             ],
           ),
-          // Menú Edición
           PopupMenuButton<String>(
             icon: const Icon(Icons.edit),
             tooltip: 'Edición',
@@ -123,7 +118,6 @@ class _EditorScreenState extends State<EditorScreen> {
               const PopupMenuItem(value: 'ir_linea', child: Text('Ir a línea')),
             ],
           ),
-          // Menú Ver
           PopupMenuButton<String>(
             icon: const Icon(Icons.visibility),
             tooltip: 'Ver',
@@ -142,17 +136,16 @@ class _EditorScreenState extends State<EditorScreen> {
       ),
       body: Column(
         children: [
-          // Área de edición principal
           Expanded(
             child: Container(
               color: const Color(0xFF1E1E1E),
               padding: const EdgeInsets.all(8.0),
               child: TextField(
                 controller: _controller,
-                maxLines: null, // Permite múltiples líneas infinitas
-                expands: true, // Ocupa todo el espacio disponible
+                maxLines: null,
+                expands: true,
                 style: const TextStyle(
-                  fontFamily: 'monospace', // Fuente monoespaciada para código
+                  fontFamily: 'monospace',
                   fontSize: 14.0,
                   color: Colors.white,
                   height: 1.5,
@@ -164,20 +157,19 @@ class _EditorScreenState extends State<EditorScreen> {
                   contentPadding: EdgeInsets.zero,
                 ),
                 cursorColor: Colors.white,
-                autocorrect: false, // Desactivar autocorrect para código
+                autocorrect: false,
                 enableSuggestions: false,
               ),
             ),
           ),
         ],
       ),
-      // Barra de estado inferior fija
       bottomNavigationBar: BottomAppBar(
         elevation: 0,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const SizedBox(width: 8), // Espaciador izquierdo
+            const SizedBox(width: 8),
             Text(
               'Ln $_currentLine, Col $_currentColumn',
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
@@ -202,7 +194,7 @@ class _EditorScreenState extends State<EditorScreen> {
               _encoding,
               style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(width: 8), // Espaciador derecho
+            const SizedBox(width: 8),
           ],
         ),
       ),
