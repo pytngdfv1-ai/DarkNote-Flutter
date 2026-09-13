@@ -10,11 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Librerías esenciales para funcionalidad real
-  file_picker: ^6.1.1      # CRUCIAL: Para abrir/guardar archivos nativamente
-  path_provider: ^2.1.2    # Para acceder a carpetas del dispositivo
-  permission_handler: ^11.3.0 # Para pedir permisos de almacenamiento
-  shared_preferences: ^2.2.2 # Para guardar configuración
+  # Librerías esenciales
+  file_picker: ^5.5.0      # Versión estable compatible con fileType
+  path_provider: ^2.1.2    
+  permission_handler: ^11.3.0 
+  shared_preferences: ^2.2.2 
 
 dev_dependencies:
   flutter_test:
