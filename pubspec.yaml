@@ -11,10 +11,10 @@ dependencies:
     sdk: flutter
   
   # Versión específica estable para evitar errores de parámetros
-  file_picker: 5.3.1
-  path_provider: ^2.1.2
-  permission_handler: ^11.3.0
-  shared_preferences: ^2.2.2
+  file_picker: ^5.3.1      
+  path_provider: ^2.1.2    
+  permission_handler: ^11.3.0 
+  shared_preferences: ^2.2.2 
 
 dev_dependencies:
   flutter_test:
