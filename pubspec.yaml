@@ -10,8 +10,8 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Librerías esenciales
-  file_picker: ^5.5.0      # Versión estable compatible con fileType
+  # Versiones específicas probadas para evitar errores de compilación
+  file_picker: ^5.5.0      
   path_provider: ^2.1.2    
   permission_handler: ^11.3.0 
   shared_preferences: ^2.2.2 
@@ -23,3 +23,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Esto asegura que Flutter reconozca los recursos si agregamos assets manuales
+  # assets:
+  #   - assets/images/
