@@ -3,20 +3,19 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    
-    <!-- Grupo central para escalar el dibujo -->
-    <group android:scaleX="0.4" android:scaleY="0.4" android:translateX="32" android:translateY="32">
-        
-        <!-- Hoja de papel (Blanco) -->
+    <group android:scaleX="0.4"
+        android:scaleY="0.4"
+        android:translateX="32"
+        android:translateY="32">
+        <!-- Hoja de papel -->
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M54,20 L90,20 C95.5,20 100,24.5 100,30 L100,90 C100,95.5 95.5,100 90,100 L30,100 C24.5,100 20,95.5 20,90 L20,30 C20,24.5 24.5,20 30,20 L54,20 Z M54,20 L54,40 L74,40 L54,20 Z"/>
-            
-        <!-- Líneas de texto simuladas (Color oscuro para contraste sobre el blanco, o azul para estilo) -->
-        <!-- Usaremos el color del tema DarkNote para las líneas -->
-        <path
-            android:fillColor="#1E1E1E"
-            android:pathData="M35,50 L85,50 L85,55 L35,55 Z M35,60 L85,60 L85,65 L35,65 Z M35,70 L70,70 L70,75 L35,75 Z"/>
-            
+            android:pathData="M54,10 L80,10 C85.5,10 90,14.5 90,20 L90,88 C90,93.5 85.5,98 80,98 L28,98 C22.5,98 18,93.5 18,88 L18,20 C18,14.5 22.5,10 28,10 Z"/>
+        <!-- Líneas de texto simuladas -->
+        <path android:strokeColor="#1E1E1E" android:strokeWidth="4" android:pathData="M30,35 L78,35"/>
+        <path android:strokeColor="#1E1E1E" android:strokeWidth="4" android:pathData="M30,50 L78,50"/>
+        <path android:strokeColor="#1E1E1E" android:strokeWidth="4" android:pathData="M30,65 L60,65"/>
+        <!-- Esquina doblada -->
+        <path android:fillColor="#CCCCCC" android:pathData="M80,10 L90,20 L80,20 Z"/>
     </group>
 </vector>
