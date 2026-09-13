@@ -1,5 +1,5 @@
 name: darknote
-description: Un editor de texto ligero con tema oscuro para Android.
+description: Un editor de texto ultraligero y oscuro para Android.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,21 +10,13 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Manejo de archivos locales
+  # Solo lo esencial para manejo de archivos
   file_picker: ^6.1.1
   path_provider: ^2.1.2
   permission_handler: ^11.3.0
   
-  # Guardar preferencias (tema, zoom, etc.)
+  # Preferencias ligeras
   shared_preferences: ^2.2.2
-  
-  # Resaltado de sintaxis básico y utilidades de texto
-  highlight: ^0.7.0
-  flutter_highlight: ^0.7.0
-  
-  # Generación de PDF (para exportar)
-  pdf: ^3.10.7
-  printing: ^5.11.1
 
 dev_dependencies:
   flutter_test:
@@ -33,7 +25,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  
-  # Assets futuros (iconos, fuentes) irán aquí
-  # assets:
-  #   - assets/icons/
