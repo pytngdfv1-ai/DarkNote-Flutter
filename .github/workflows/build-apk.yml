@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Permite ejecutar manualmente desde la UI de GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -27,17 +27,31 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
 
-      - name: Generate Flutter Project Structure
-        # Este comando crea las carpetas android/, ios/, etc. si faltan
-        # Usamos --platforms=android para ahorrar tiempo y solo crear lo necesario
-        # Usamos --no-overwrite para no borrar tu pubspec.yaml o lib/main.dart
-        run: flutter create --platforms=android --no-overwrite .
+      - name: Backup custom files
+        run: |
+          mkdir -p /tmp/darknote_backup
+          cp pubspec.yaml /tmp/darknote_backup/
+          cp -r lib /tmp/darknote_backup/
+
+      - name: Generate Flutter Project Structure with valid name
+        run: flutter create --platforms=android darknote_app
+
+      - name: Copy generated android folder to root
+        run: |
+          mv darknote_app/android ./
+          mv darknote_app/pubspec.yaml ./pubspec.yaml.original
+          rm -rf darknote_app
+
+      - name: Restore custom pubspec.yaml
+        run: cp /tmp/darknote_backup/pubspec.yaml ./pubspec.yaml
+
+      - name: Restore custom lib folder
+        run: cp -r /tmp/darknote_backup/lib ./
 
       - name: Get dependencies
         run: flutter pub get
 
       - name: Create Android local properties
-        # Ahora sí existe la carpeta android/, así que esto funcionará
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
