@@ -1,1 +1,22 @@
-
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Grupo central para escalar el dibujo -->
+    <group android:scaleX="0.4" android:scaleY="0.4" android:translateX="32" android:translateY="32">
+        
+        <!-- Hoja de papel (Blanco) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,20 L90,20 C95.5,20 100,24.5 100,30 L100,90 C100,95.5 95.5,100 90,100 L30,100 C24.5,100 20,95.5 20,90 L20,30 C20,24.5 24.5,20 30,20 L54,20 Z M54,20 L54,40 L74,40 L54,20 Z"/>
+            
+        <!-- Líneas de texto simuladas (Color oscuro para contraste sobre el blanco, o azul para estilo) -->
+        <!-- Usaremos el color del tema DarkNote para las líneas -->
+        <path
+            android:fillColor="#1E1E1E"
+            android:pathData="M35,50 L85,50 L85,55 L35,55 Z M35,60 L85,60 L85,65 L35,65 Z M35,70 L70,70 L70,75 L35,75 Z"/>
+            
+    </group>
+</vector>
