@@ -1,0 +1,55 @@
+name: Build DarkNote APK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch: # Permite ejecutar manualmente desde la UI de GitHub
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.19.0' # Versión estable conocida
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Create Android local properties (si no existe)
+        run: |
+          if [ ! -f android/local.properties ]; then
+            echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+          fi
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+
+      - name: Enable Android project (Genera archivos faltantes si es necesario)
+        run: |
+          # Esto asegura que la carpeta android/ esté correctamente configurada
+          # incluso si solo subimos pubspec.yaml y lib/main.dart
+          flutter create --platforms=android --no-overwrite . 
+
+      - name: Build Debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: darknote-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
