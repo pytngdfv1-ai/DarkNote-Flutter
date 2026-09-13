@@ -27,24 +27,65 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
 
-      # SOLUCIÓN AL ERROR DE NOMBRE: Forzamos el nombre 'darknote'
-      - name: Generate Flutter Project Structure
-        run: flutter create --platforms=android --project-name darknote --no-overwrite .
+      - name: Clean and Create Flutter Project Structure
+        run: |
+          # Eliminar carpeta android para evitar conflictos de generación
+          rm -rf android
+          # Crear proyecto flutter con nombre válido y plataforma android
+          flutter create --platforms=android --project-name darknote .
+
+      - name: Fix AndroidManifest.xml
+        run: |
+          # Forzar la creación de un AndroidManifest.xml válido si hubo errores
+          MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
+          if [ ! -f "$MANIFEST_PATH" ] || ! grep -q "<manifest" "$MANIFEST_PATH"; then
+            echo "Regenerando AndroidManifest.xml..."
+            cat > "$MANIFEST_PATH" <<EOF
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:label="DarkNote"
+        android:name="\${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:theme="@style/LaunchTheme">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <meta-data android:name="flutterEmbedding" android:value="2" />
+    </application>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+</manifest>
+EOF
+          fi
 
       - name: Get dependencies
         run: flutter pub get
 
       - name: Create Android local properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
 
-      # Optimización: Build Release es más rápido de ejecutar y más estable que Debug en CI
-      # Usamos --split-per-abi para generar APKs más pequeños (aprox 5-8MB vs 20MB)
-      - name: Build Release APK (Split per ABI)
+      - name: Build Release APK (Split per ABI for lightweight)
         run: flutter build apk --release --split-per-abi
 
-      - name: Upload APK Artifacts
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: darknote-release-apks
+          name: darknote-release-apk
           path: build/app/outputs/flutter-apk/*.apk
           retention-days: 7
