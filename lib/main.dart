@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 
 void main() {
@@ -64,9 +63,7 @@ class _EditorScreenState extends State<EditorScreen> {
   final List<String> _history = [];
   int _historyIndex = -1;
   bool _isTyping = false;
-  
   String? _currentFilePath;
-  String _fileName = "Sin título";
 
   @override
   void initState() {
@@ -84,11 +81,9 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   Future<void> _requestPermissions() async {
-    if (Platform.isAndroid) {
-      await Permission.storage.request();
-      // Para Android 13+
-      await Permission.photos.request();
-    }
+    // En Android 13+ file_picker maneja permisos automáticamente
+    // Para versiones anteriores, permission_handler podría ser necesario
+    // pero file_picker ya lo solicita al abrir el diálogo
   }
 
   Future<void> _loadPreferences() async {
@@ -97,6 +92,13 @@ class _EditorScreenState extends State<EditorScreen> {
       _wordWrap = prefs.getBool('wordWrap') ?? false;
       _zoomLevel = prefs.getDouble('zoom') ?? 1.0;
       _showLineNumbers = prefs.getBool('lineNumbers') ?? false;
+      // Cargar último contenido si existe
+      final lastContent = prefs.getString('lastContent');
+      if (lastContent != null && lastContent.isNotEmpty) {
+        _controller.text = lastContent;
+        _history.add(lastContent);
+        _historyIndex = 0;
+      }
     });
   }
 
@@ -105,6 +107,7 @@ class _EditorScreenState extends State<EditorScreen> {
     await prefs.setBool('wordWrap', _wordWrap);
     await prefs.setDouble('zoom', _zoomLevel);
     await prefs.setBool('lineNumbers', _showLineNumbers);
+    await prefs.setString('lastContent', _controller.text);
   }
 
   void _updateCursorPosition() {
@@ -129,34 +132,34 @@ class _EditorScreenState extends State<EditorScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('DarkNote - $_fileName'),
+        title: Text(_currentFilePath == null ? 'DarkNote - Sin título' : 'DarkNote - ${_currentFilePath!.split('/').last}'),
         actions: [
           _buildMenu('Archivo', [
-            MenuItem('Nuevo', _newFile),
-            MenuItem('Abrir', _openFile),
-            MenuItem('Guardar', _saveFile),
-            MenuItem('Guardar como', _saveFileAs),
+            const PopupMenuItem(value: 'nuevo', child: Text('Nuevo')),
+            const PopupMenuItem(value: 'abrir', child: Text('Abrir')),
+            const PopupMenuItem(value: 'guardar', child: Text('Guardar')),
+            const PopupMenuItem(value: 'guardar_como', child: Text('Guardar como')),
             const PopupMenuDivider(),
-            MenuItem('Salir', () => SystemNavigator.pop()),
+            const PopupMenuItem(value: 'exportar', child: Text('Exportar PDF (Pronto)')),
           ]),
           _buildMenu('Edición', [
-            MenuItem('Deshacer', _undo),
-            MenuItem('Rehacer', _redo),
+            const PopupMenuItem(value: 'deshacer', child: Text('Deshacer')),
+            const PopupMenuItem(value: 'rehacer', child: Text('Rehacer')),
             const PopupMenuDivider(),
-            MenuItem('Buscar', _showSearchDialog),
-            MenuItem('Ir a línea', _goToLine),
-            MenuItem('Seleccionar todo', _selectAll),
+            const PopupMenuItem(value: 'buscar', child: Text('Buscar')),
+            const PopupMenuItem(value: 'ir_linea', child: Text('Ir a línea')),
+            const PopupMenuItem(value: 'seleccionar_todo', child: Text('Seleccionar todo')),
           ]),
           _buildMenu('Ver', [
-            MenuItem(_wordWrap ? 'Desactivar Ajuste' : 'Activar Ajuste', _toggleWordWrap),
-            MenuItem(_showLineNumbers ? 'Ocultar Números' : 'Mostrar Números', _toggleLineNumbers),
-            MenuItem('Zoom +', () => _adjustZoom(0.1)),
-            MenuItem('Zoom -', () => _adjustZoom(-0.1)),
+            PopupMenuItem(value: 'ajuste', child: Text(_wordWrap ? 'Desactivar Ajuste' : 'Activar Ajuste')),
+            PopupMenuItem(value: 'numeros', child: Text(_showLineNumbers ? 'Ocultar Números' : 'Mostrar Números')),
+            const PopupMenuItem(value: 'zoom_in', child: Text('Zoom +')),
+            const PopupMenuItem(value: 'zoom_out', child: Text('Zoom -')),
           ]),
           _buildMenu('Herramientas', [
-            MenuItem(_terminalVisible ? 'Ocultar Terminal' : 'Mostrar Terminal', _toggleTerminal),
-            MenuItem('Ejecutar Código', _runCode),
-            MenuItem('Revisar Sintaxis', _checkSyntax),
+            PopupMenuItem(value: 'terminal', child: Text(_terminalVisible ? 'Ocultar Terminal' : 'Mostrar Terminal')),
+            const PopupMenuItem(value: 'ejecutar', child: Text('Ejecutar Código')),
+            const PopupMenuItem(value: 'sintaxis', child: Text('Revisar Sintaxis')),
           ]),
           const SizedBox(width: 8),
         ],
@@ -170,7 +173,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   controller: _controller,
                   maxLines: null,
                   expands: true,
-                  textAlign: _showLineNumbers ? TextAlign.right : TextAlign.left,
+                  textAlign: TextAlign.left,
                   style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: fontSize,
@@ -198,8 +201,10 @@ class _EditorScreenState extends State<EditorScreen> {
                       }
                     });
                     Future.delayed(const Duration(milliseconds: 100), () {
-                      if(mounted) setState(() => _isTyping = false);
-                      _updateCursorPosition();
+                      if (mounted) {
+                        setState(() => _isTyping = false);
+                        _updateCursorPosition();
+                      }
                     });
                   },
                 ),
@@ -214,7 +219,7 @@ class _EditorScreenState extends State<EditorScreen> {
                       alignment: Alignment.topRight,
                       padding: const EdgeInsets.only(right: 4, top: 8),
                       child: Text(
-                        List.generate(_totalLines, (i) => i + 1).join('\n'),
+                        List.generate(_totalLines > 0 ? _totalLines : 1, (i) => i + 1).join('\n'),
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: fontSize,
@@ -272,112 +277,97 @@ class _EditorScreenState extends State<EditorScreen> {
     return PopupMenuButton<String>(
       tooltip: title,
       onSelected: (value) {
-        // Buscar el item y ejecutar su acción si es necesario
-        // Aquí simplificamos pasando funciones directas en la construcción si fuera necesario
-        // Pero para este ejemplo usaremos un mapa simple o switch si fuera complejo
-        // Dado que items ya contiene la lógica en su construcción personalizada abajo, 
-        // necesitamos una forma de vincular valor a acción. 
-        // Simplificación: Usaremos el valor para identificar.
-        if (value == 'nuevo') _newFile();
-        else if (value == 'abrir') _openFile();
-        else if (value == 'guardar') _saveFile();
-        else if (value == 'guardar_como') _saveFileAs();
-        else if (value == 'salir') SystemNavigator.pop();
-        else if (value == 'deshacer') _undo();
-        else if (value == 'rehacer') _redo();
-        else if (value == 'buscar') _showSearchDialog();
-        else if (value == 'ir_linea') _goToLine();
-        else if (value == 'seleccionar_todo') _selectAll();
-        else if (value == 'toggle_wrap') _toggleWordWrap();
-        else if (value == 'toggle_numbers') _toggleLineNumbers();
-        else if (value == 'zoom_in') _adjustZoom(0.1);
-        else if (value == 'zoom_out') _adjustZoom(-0.1);
-        else if (value == 'toggle_terminal') _toggleTerminal();
-        else if (value == 'run_code') _runCode();
-        else if (value == 'check_syntax') _checkSyntax();
+        _handleMenuAction(value);
       },
       itemBuilder: (context) => items,
     );
   }
 
-  // Helper para crear items de menú con valores fijos
-  List<PopupMenuEntry<String>> _createFileMenu() {
-    return [
-      const PopupMenuItem(value: 'nuevo', child: Text('Nuevo')),
-      const PopupMenuItem(value: 'abrir', child: Text('Abrir')),
-      const PopupMenuItem(value: 'guardar', child: Text('Guardar')),
-      const PopupMenuItem(value: 'guardar_como', child: Text('Guardar como')),
-      const PopupMenuDivider(),
-      const PopupMenuItem(value: 'salir', child: Text('Salir')),
-    ];
-  }
-  
-  List<PopupMenuEntry<String>> _createEditMenu() {
-    return [
-      const PopupMenuItem(value: 'deshacer', child: Text('Deshacer')),
-      const PopupMenuItem(value: 'rehacer', child: Text('Rehacer')),
-      const PopupMenuDivider(),
-      const PopupMenuItem(value: 'buscar', child: Text('Buscar')),
-      const PopupMenuItem(value: 'ir_linea', child: Text('Ir a línea')),
-      const PopupMenuItem(value: 'seleccionar_todo', child: Text('Seleccionar todo')),
-    ];
+  void _handleMenuAction(String value) {
+    switch (value) {
+      case 'nuevo':
+        _newFile();
+        break;
+      case 'abrir':
+        _openFile();
+        break;
+      case 'guardar':
+        _saveFile();
+        break;
+      case 'guardar_como':
+        _saveFileAs();
+        break;
+      case 'deshacer':
+        _undo();
+        break;
+      case 'rehacer':
+        _redo();
+        break;
+      case 'buscar':
+        _showSearchDialog();
+        break;
+      case 'ir_linea':
+        _goToLine();
+        break;
+      case 'seleccionar_todo':
+        _selectAll();
+        break;
+      case 'ajuste':
+        _toggleWordWrap();
+        break;
+      case 'numeros':
+        _toggleLineNumbers();
+        break;
+      case 'zoom_in':
+        _adjustZoom(0.1);
+        break;
+      case 'zoom_out':
+        _adjustZoom(-0.1);
+        break;
+      case 'terminal':
+        _toggleTerminal();
+        break;
+      case 'ejecutar':
+        _runCode();
+        break;
+      case 'sintaxis':
+        _checkSyntax();
+        break;
+    }
   }
 
-  List<PopupMenuEntry<String>> _createViewMenu() {
-    return [
-      PopupMenuItem(value: 'toggle_wrap', child: Text(_wordWrap ? 'Desactivar Ajuste' : 'Activar Ajuste')),
-      PopupMenuItem(value: 'toggle_numbers', child: Text(_showLineNumbers ? 'Ocultar Números' : 'Mostrar Números')),
-      const PopupMenuItem(value: 'zoom_in', child: Text('Zoom +')),
-      const PopupMenuItem(value: 'zoom_out', child: Text('Zoom -')),
-    ];
-  }
-
-  List<PopupMenuEntry<String>> _createToolsMenu() {
-    return [
-      PopupMenuItem(value: 'toggle_terminal', child: Text(_terminalVisible ? 'Ocultar Terminal' : 'Mostrar Terminal')),
-      const PopupMenuItem(value: 'run_code', child: Text('Ejecutar Código')),
-      const PopupMenuItem(value: 'check_syntax', child: Text('Revisar Sintaxis')),
-    ];
-  }
-
-  // Re-definimos build para usar los helpers correctamente si se prefiere, 
-  // pero para mantener la estructura anterior simple, modificaremos ligeramente la llamada en build:
-  // Nota: En el build de arriba, reemplaza las llamadas a _buildMenu con listas estáticas o usa esta lógica:
-  // Para simplificar y evitar errores de tipo en esta respuesta, asumiremos que el usuario reemplazará
-  // la sección 'actions' en el build con las llamadas a los helpers _create...Menu()
-  // O mejor, corregimos el _buildMenu original para aceptar List<PopupMenuEntry<String>> directamente.
-  
-  // Funciones de lógica
-  
   void _newFile() {
     setState(() {
       _controller.clear();
-      _fileName = "Sin título";
       _currentFilePath = null;
       _history.clear();
       _historyIndex = -1;
     });
+    _showMsg("Nuevo archivo creado");
   }
 
   Future<void> _openFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['txt', 'dart', 'js', 'html', 'css', 'json', 'md', 'py'],
+        allowedExtensions: ['txt', 'dart', 'js', 'py', 'java', 'cpp', 'c', 'h', 'html', 'css', 'json', 'xml', 'md'],
       );
 
       if (result != null && result.files.single.path != null) {
         File file = File(result.files.single.path!);
         String content = await file.readAsString();
+        
         setState(() {
           _controller.text = content;
-          _fileName = result.files.single.name;
-          _currentFilePath = file.path;
+          _currentFilePath = result.files.single.path;
           _history.clear();
           _history.add(content);
           _historyIndex = 0;
         });
-        _showMsg("Archivo abierto: $_fileName");
+        _showMsg("Archivo abierto: ${result.files.single.name}");
+        _savePreferences();
+      } else {
+        _showMsg("No se seleccionó ningún archivo");
       }
     } catch (e) {
       _showMsg("Error al abrir archivo: $e");
@@ -391,7 +381,8 @@ class _EditorScreenState extends State<EditorScreen> {
       try {
         File file = File(_currentFilePath!);
         await file.writeAsString(_controller.text);
-        _showMsg("Archivo guardado: $_fileName");
+        _showMsg("Archivo guardado correctamente");
+        _savePreferences();
       } catch (e) {
         _showMsg("Error al guardar: $e");
       }
@@ -400,29 +391,37 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _saveFileAs() async {
     try {
-      // En Android, guardamos en Documents por defecto para evitar permisos complejos de SAF en esta demo
+      // Guardar en la carpeta Documents del dispositivo
       Directory? directory = await getExternalStorageDirectory();
       String newPath = "";
       
       if (directory != null) {
-        // Navegar hasta la carpeta Documents pública si es posible, o usar la app-specific
-        // Para simplicidad y compatibilidad, usamos la carpeta de documentos de la app o la raíz de storage si tiene permiso
-        newPath = directory.path; 
-        // Intentamos subir a Documents público si tenemos permiso, sino usamos la carpeta de la app
-        // Nota: getExternalStorageDirectory() ya da una ruta válida y escribible sin permisos extra en Android 10+ (Scoped Storage)
-        
-        String fileName = "nota_${DateTime.now().millisecondsSinceEpoch}.txt";
-        File file = File("$newPath/$fileName");
-        await file.writeAsString(_controller.text);
-        
-        setState(() {
-          _currentFilePath = file.path;
-          _fileName = fileName;
-        });
-        _showMsg("Guardado en: ${file.path}");
+        // Navegar hasta la carpeta Documents
+        List<String> paths = directory.path.split('/');
+        if (paths.length >= 5) {
+          newPath = paths.sublist(0, paths.length - 4).join('/') + '/Documents';
+        } else {
+          newPath = directory.path;
+        }
       } else {
-        _showMsg("No se pudo acceder al almacenamiento.");
+        // Fallback a directorio temporal si falla
+        directory = await getTemporaryDirectory();
+        newPath = directory.path;
       }
+
+      // Crear nombre de archivo con timestamp
+      String fileName = "nota_${DateTime.now().millisecondsSinceEpoch}.txt";
+      String fullPath = "$newPath/$fileName";
+      
+      File file = File(fullPath);
+      await file.writeAsString(_controller.text);
+      
+      setState(() {
+        _currentFilePath = fullPath;
+      });
+      
+      _showMsg("Guardado en: $fullPath");
+      _savePreferences();
     } catch (e) {
       _showMsg("Error al guardar como: $e");
     }
@@ -430,44 +429,89 @@ class _EditorScreenState extends State<EditorScreen> {
 
   void _undo() {
     if (_historyIndex > 0) {
-      setState(() {
-        _historyIndex--;
-        _controller.text = _history[_historyIndex];
-        _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
-      });
+      _historyIndex--;
+      _controller.text = _history[_historyIndex];
+      _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
     }
   }
 
   void _redo() {
     if (_historyIndex < _history.length - 1) {
-      setState(() {
-        _historyIndex++;
-        _controller.text = _history[_historyIndex];
-        _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
-      });
+      _historyIndex++;
+      _controller.text = _history[_historyIndex];
+      _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
     }
   }
 
   void _showSearchDialog() {
-    showDialog(context: context, builder: (_) => AlertDialog(title: const Text("Buscar"), content: const Text("Función Buscar (Pronto)")));
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Buscar"),
+        content: TextField(
+          decoration: const InputDecoration(hintText: "Texto a buscar..."),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancelar"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // Lógica de búsqueda simple
+              Navigator.pop(context);
+              _showMsg("Función de búsqueda completa en desarrollo");
+            },
+            child: const Text("Buscar"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _goToLine() {
-    showDialog(context: context, builder: (_) => AlertDialog(title: const Text("Ir a Línea"), content: const Text("Ingresa número de línea (Pronto)")));
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Ir a Línea"),
+        content: TextField(
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(hintText: "Número de línea"),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancelar"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showMsg("Función Ir a Línea en desarrollo");
+            },
+            child: const Text("Ir"),
+          ),
+        ],
+      ),
+    );
   }
 
   void _selectAll() {
     _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+    _showMsg("Todo el texto seleccionado");
   }
 
   void _toggleWordWrap() {
     setState(() => _wordWrap = !_wordWrap);
     _savePreferences();
+    _showMsg(_wordWrap ? "Ajuste de línea activado" : "Ajuste de línea desactivado");
   }
 
   void _toggleLineNumbers() {
     setState(() => _showLineNumbers = !_showLineNumbers);
     _savePreferences();
+    _showMsg(_showLineNumbers ? "Números de línea visibles" : "Números de línea ocultos");
   }
 
   void _adjustZoom(double delta) {
@@ -475,6 +519,7 @@ class _EditorScreenState extends State<EditorScreen> {
       _zoomLevel = ((_zoomLevel + delta).clamp(0.5, 2.0));
     });
     _savePreferences();
+    _showMsg("Zoom: ${(_zoomLevel * 100).toInt()}%");
   }
 
   void _toggleTerminal() {
@@ -482,25 +527,33 @@ class _EditorScreenState extends State<EditorScreen> {
   }
 
   void _runCode() {
-    _showMsg("Ejecutando código simulado...");
+    _showMsg("Ejecutando código simulado... (Requiere configuración de entorno)");
   }
 
   void _checkSyntax() {
     int openP = 0;
     int closeP = 0;
     
-    // Corrección de sintaxis: eliminar paréntesis extra
-    openP = '({['.split('').fold(0, (sum, c) => sum + _controller.text.split(c).length - 1);
-    closeP = ')}]'.split('').fold(0, (sum, c) => sum + _controller.text.split(c).length - 1);
-
+    // Contar paréntesis, llaves y corchetes
+    for (var char in '({['.split('')) {
+      openP += _controller.text.split(char).length - 1;
+    }
+    for (var char in ')}]'.split('')) {
+      closeP += _controller.text.split(char).length - 1;
+    }
+    
     if (openP == closeP) {
-      _showMsg("Sintaxis correcta (Paréntesis balanceados).");
+      _showMsg("Sintaxis correcta: Paréntesis balanceados");
     } else {
-      _showMsg("Error de sintaxis: $openP abiertos, $closeP cerrados.");
+      _showMsg("Error de sintaxis: $openP apertura(s), $closeP cierre(s)");
     }
   }
 
   void _showMsg(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 2)));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
+      );
+    }
   }
 }
