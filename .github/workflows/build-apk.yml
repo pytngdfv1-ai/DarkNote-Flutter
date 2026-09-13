@@ -1,9 +1,7 @@
-name: Build DarkNote APK
+name: Build Optimized APK
 
 on:
   push:
-    branches: [ "main", "master" ]
-  pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
@@ -27,41 +25,23 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
 
-      - name: Backup custom files
-        run: |
-          mkdir -p /tmp/darknote_backup
-          cp pubspec.yaml /tmp/darknote_backup/
-          cp -r lib /tmp/darknote_backup/
-
-      - name: Generate Flutter Project Structure with valid name
-        run: flutter create --platforms=android darknote_app
-
-      - name: Copy generated android folder to root
-        run: |
-          mv darknote_app/android ./
-          mv darknote_app/pubspec.yaml ./pubspec.yaml.original
-          rm -rf darknote_app
-
-      - name: Restore custom pubspec.yaml
-        run: cp /tmp/darknote_backup/pubspec.yaml ./pubspec.yaml
-
-      - name: Restore custom lib folder
-        run: cp -r /tmp/darknote_backup/lib ./
+      - name: Generate Android Project
+        run: flutter create --platforms=android --no-overwrite .
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Create Android local properties
+      - name: Create local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
 
-      - name: Build Debug APK
-        run: flutter build apk --debug
+      - name: Build Split APKs (Release)
+        # --split-per-abi crea APKs pequeños específicos para cada arquitectura
+        # --release optimiza el código y reduce drásticamente el tamaño
+        run: flutter build apk --release --split-per-abi
 
-      - name: Upload APK Artifact
+      - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: darknote-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 7
+          name: darknote-release-apks
+          path: build/app/outputs/flutter-apk/*.apk
+          retention-days: 14
