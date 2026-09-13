@@ -1,7 +1,9 @@
-name: Build Optimized APK
+name: Build DarkNote APK
 
 on:
   push:
+    branches: [ "main", "master" ]
+  pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
@@ -25,18 +27,19 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
 
-      - name: Generate Android Project
-        run: flutter create --platforms=android --no-overwrite .
+      # SOLUCIÓN AL ERROR DE NOMBRE: Forzamos el nombre 'darknote'
+      - name: Generate Flutter Project Structure
+        run: flutter create --platforms=android --project-name darknote --no-overwrite .
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Create local.properties
+      - name: Create Android local properties
         run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
-      - name: Build Split APKs (Release)
-        # --split-per-abi crea APKs pequeños específicos para cada arquitectura
-        # --release optimiza el código y reduce drásticamente el tamaño
+      # Optimización: Build Release es más rápido de ejecutar y más estable que Debug en CI
+      # Usamos --split-per-abi para generar APKs más pequeños (aprox 5-8MB vs 20MB)
+      - name: Build Release APK (Split per ABI)
         run: flutter build apk --release --split-per-abi
 
       - name: Upload APK Artifacts
@@ -44,4 +47,4 @@ jobs:
         with:
           name: darknote-release-apks
           path: build/app/outputs/flutter-apk/*.apk
-          retention-days: 14
+          retention-days: 7
