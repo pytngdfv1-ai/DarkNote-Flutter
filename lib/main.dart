@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 void main() {
@@ -33,6 +33,11 @@ class DarkNoteApp extends StatelessWidget {
           color: Color(0xFF252526),
           textStyle: TextStyle(color: Colors.white),
         ),
+        dialogTheme: const DialogTheme(
+          backgroundColor: Color(0xFF252526),
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 18),
+          contentTextStyle: TextStyle(color: Colors.white70),
+        ),
       ),
       home: const EditorScreen(),
     );
@@ -56,21 +61,22 @@ class _EditorScreenState extends State<EditorScreen> {
   String _encoding = 'UTF-8';
   double _zoomLevel = 1.0;
   bool _showLineNumbers = false;
-  bool _highlightCurrentLine = false;
   bool _isReadOnly = false;
   bool _terminalVisible = false;
+  
+  // Variables de estado de archivo
+  String? _currentFilePath;
+  String _fileName = "Sin título";
   
   final List<String> _history = [];
   int _historyIndex = -1;
   bool _isTyping = false;
-  String? _currentFilePath;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(_updateCursorPosition);
     _loadPreferences();
-    _requestPermissions();
   }
 
   @override
@@ -80,25 +86,12 @@ class _EditorScreenState extends State<EditorScreen> {
     super.dispose();
   }
 
-  Future<void> _requestPermissions() async {
-    // En Android 13+ file_picker maneja permisos automáticamente
-    // Para versiones anteriores, permission_handler podría ser necesario
-    // pero file_picker ya lo solicita al abrir el diálogo
-  }
-
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _wordWrap = prefs.getBool('wordWrap') ?? false;
       _zoomLevel = prefs.getDouble('zoom') ?? 1.0;
       _showLineNumbers = prefs.getBool('lineNumbers') ?? false;
-      // Cargar último contenido si existe
-      final lastContent = prefs.getString('lastContent');
-      if (lastContent != null && lastContent.isNotEmpty) {
-        _controller.text = lastContent;
-        _history.add(lastContent);
-        _historyIndex = 0;
-      }
     });
   }
 
@@ -107,7 +100,6 @@ class _EditorScreenState extends State<EditorScreen> {
     await prefs.setBool('wordWrap', _wordWrap);
     await prefs.setDouble('zoom', _zoomLevel);
     await prefs.setBool('lineNumbers', _showLineNumbers);
-    await prefs.setString('lastContent', _controller.text);
   }
 
   void _updateCursorPosition() {
@@ -126,40 +118,243 @@ class _EditorScreenState extends State<EditorScreen> {
     });
   }
 
+  // --- FUNCIONES DE ARCHIVO REALES ---
+
+  Future<void> _openFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['txt', 'md', 'dart', 'js', 'py', 'json', 'xml', 'html', 'css'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        File file = File(result.files.single.path!);
+        String content = await file.readAsString();
+        
+        setState(() {
+          _controller.text = content;
+          _currentFilePath = file.path;
+          _fileName = result.files.single.name;
+          _history.clear();
+          _history.add(content);
+          _historyIndex = 0;
+        });
+        _showMsg("Archivo abierto: $_fileName");
+      } else {
+        _showMsg("Operación cancelada");
+      }
+    } catch (e) {
+      _showMsg("Error al abrir: $e");
+    }
+  }
+
+  Future<void> _saveFile() async {
+    if (_currentFilePath == null) {
+      await _saveFileAs();
+      return;
+    }
+
+    try {
+      File file = File(_currentFilePath!);
+      await file.writeAsString(_controller.text);
+      _showMsg("Guardado exitosamente en: $_fileName");
+    } catch (e) {
+      _showMsg("Error al guardar: $e");
+    }
+  }
+
+  Future<void> _saveFileAs() async {
+    try {
+      // Usar el selector nativo de Android para elegir ruta y nombre
+      String? outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: "Guardar archivo como...",
+        fileName: "nota_${DateTime.now().millisecondsSinceEpoch}.txt",
+        fileType: FileType.custom,
+        allowedExtensions: ['txt'],
+      );
+
+      if (outputPath != null) {
+        File file = File(outputPath);
+        await file.writeAsString(_controller.text);
+        
+        setState(() {
+          _currentFilePath = outputPath;
+          _fileName = outputPath.split('/').last;
+        });
+        
+        _showMsg("Archivo guardado en: $_fileName");
+      } else {
+        _showMsg("Guardado cancelado");
+      }
+    } catch (e) {
+      _showMsg("Error fatal al guardar: $e");
+    }
+  }
+
+  // --- FUNCIONES DE EDICIÓN ---
+
+  void _newFile() {
+    setState(() {
+      _controller.clear();
+      _currentFilePath = null;
+      _fileName = "Sin título";
+      _history.clear();
+      _historyIndex = -1;
+    });
+    _showMsg("Nuevo archivo creado");
+  }
+
+  void _undo() {
+    if (_historyIndex > 0) {
+      setState(() {
+        _historyIndex--;
+        _controller.text = _history[_historyIndex];
+        _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
+      });
+    }
+  }
+
+  void _redo() {
+    if (_historyIndex < _history.length - 1) {
+      setState(() {
+        _historyIndex++;
+        _controller.text = _history[_historyIndex];
+        _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
+      });
+    }
+  }
+
+  void _checkSyntax() {
+    int openP = 0;
+    int closeP = 0;
+    
+    // Contar paréntesis, llaves y corchetes
+    for (int i = 0; i < _controller.text.length; i++) {
+      String char = _controller.text[i];
+      if ('({['.contains(char)) openP++;
+      if (')}]'.contains(char)) closeP++;
+    }
+
+    if (openP == closeP) {
+      _showMsg("✓ Sintaxis válida: Estructura balanceada.");
+    } else {
+      _showMsg("⚠ Error de sintaxis: Tienes $openP aperturas y $closeP cierres.");
+    }
+  }
+
+  void _runCode() {
+    _showMsg("Ejecutando simulación... (Requiere configuración de entorno)");
+    setState(() => _terminalVisible = true);
+  }
+
+  void _toggleTerminal() {
+    setState(() => _terminalVisible = !_terminalVisible);
+  }
+
+  void _selectAll() {
+    _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
+    _showMsg("Todo seleccionado");
+  }
+
+  void _goToLine() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final ctrl = TextEditingController();
+        return AlertDialog(
+          title: const Text("Ir a línea"),
+          content: TextField(
+            controller: ctrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(hintText: "Número de línea"),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("Cancelar")),
+            TextButton(
+              onPressed: () {
+                int line = int.tryParse(ctrl.text) ?? 1;
+                // Lógica simple para ir a línea
+                List<String> lines = _controller.text.split('\n');
+                if (line > lines.length) line = lines.length;
+                int pos = 0;
+                for(int i=0; i<line-1; i++) pos += lines[i].length + 1;
+                
+                _controller.selection = TextSelection(baseOffset: pos, extentOffset: pos);
+                Navigator.pop(ctx);
+              },
+              child: const Text("Ir"),
+            )
+          ],
+        );
+      },
+    );
+  }
+
+  void _toggleWordWrap() {
+    setState(() => _wordWrap = !_wordWrap);
+    _savePreferences();
+  }
+
+  void _toggleLineNumbers() {
+    setState(() => _showLineNumbers = !_showLineNumbers);
+    _savePreferences();
+  }
+
+  void _adjustZoom(double delta) {
+    setState(() {
+      _zoomLevel = ((_zoomLevel + delta).clamp(0.5, 2.0));
+    });
+    _savePreferences();
+  }
+
+  void _showMsg(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: Colors.grey[800],
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final fontSize = 14.0 * _zoomLevel;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentFilePath == null ? 'DarkNote - Sin título' : 'DarkNote - ${_currentFilePath!.split('/').last}'),
+        title: Text(_fileName),
         actions: [
           _buildMenu('Archivo', [
-            const PopupMenuItem(value: 'nuevo', child: Text('Nuevo')),
-            const PopupMenuItem(value: 'abrir', child: Text('Abrir')),
-            const PopupMenuItem(value: 'guardar', child: Text('Guardar')),
-            const PopupMenuItem(value: 'guardar_como', child: Text('Guardar como')),
-            const PopupMenuDivider(),
-            const PopupMenuItem(value: 'exportar', child: Text('Exportar PDF (Pronto)')),
+            MenuItem('Nuevo', Icons.note_add, _newFile),
+            MenuItem('Abrir', Icons.folder_open, _openFile),
+            MenuItem('Guardar', Icons.save, _saveFile),
+            MenuItem('Guardar como', Icons.save_as, _saveFileAs),
+            const Divider(height: 1),
+            MenuItem('Exportar PDF', Icons.picture_as_pdf, () => _showMsg("Próximamente")),
           ]),
           _buildMenu('Edición', [
-            const PopupMenuItem(value: 'deshacer', child: Text('Deshacer')),
-            const PopupMenuItem(value: 'rehacer', child: Text('Rehacer')),
-            const PopupMenuDivider(),
-            const PopupMenuItem(value: 'buscar', child: Text('Buscar')),
-            const PopupMenuItem(value: 'ir_linea', child: Text('Ir a línea')),
-            const PopupMenuItem(value: 'seleccionar_todo', child: Text('Seleccionar todo')),
+            MenuItem('Deshacer', Icons.undo, _undo),
+            MenuItem('Rehacer', Icons.redo, _redo),
+            const Divider(height: 1),
+            MenuItem('Buscar', Icons.search, () => _showMsg("Buscar: Próximamente")),
+            MenuItem('Ir a línea', Icons.arrow_downward, _goToLine),
+            MenuItem('Seleccionar todo', Icons.select_all, _selectAll),
           ]),
           _buildMenu('Ver', [
-            PopupMenuItem(value: 'ajuste', child: Text(_wordWrap ? 'Desactivar Ajuste' : 'Activar Ajuste')),
-            PopupMenuItem(value: 'numeros', child: Text(_showLineNumbers ? 'Ocultar Números' : 'Mostrar Números')),
-            const PopupMenuItem(value: 'zoom_in', child: Text('Zoom +')),
-            const PopupMenuItem(value: 'zoom_out', child: Text('Zoom -')),
+            MenuItem(_wordWrap ? 'Desactivar Ajuste' : 'Activar Ajuste', Icons.wrap_text, _toggleWordWrap),
+            MenuItem(_showLineNumbers ? 'Ocultar Números' : 'Mostrar Números', Icons.format_list_numbered, _toggleLineNumbers),
+            const Divider(height: 1),
+            MenuItem('Zoom +', Icons.zoom_in, () => _adjustZoom(0.1)),
+            MenuItem('Zoom -', Icons.zoom_out, () => _adjustZoom(-0.1)),
           ]),
           _buildMenu('Herramientas', [
-            PopupMenuItem(value: 'terminal', child: Text(_terminalVisible ? 'Ocultar Terminal' : 'Mostrar Terminal')),
-            const PopupMenuItem(value: 'ejecutar', child: Text('Ejecutar Código')),
-            const PopupMenuItem(value: 'sintaxis', child: Text('Revisar Sintaxis')),
+            MenuItem(_terminalVisible ? 'Ocultar Terminal' : 'Mostrar Terminal', Icons.terminal, _toggleTerminal),
+            MenuItem('Ejecutar Código', Icons.play_arrow, _runCode),
+            MenuItem('Revisar Sintaxis', Icons.check_circle_outline, _checkSyntax),
           ]),
           const SizedBox(width: 8),
         ],
@@ -173,7 +368,7 @@ class _EditorScreenState extends State<EditorScreen> {
                   controller: _controller,
                   maxLines: null,
                   expands: true,
-                  textAlign: TextAlign.left,
+                  textAlign: _showLineNumbers ? TextAlign.right : TextAlign.left,
                   style: TextStyle(
                     fontFamily: 'monospace',
                     fontSize: fontSize,
@@ -201,10 +396,8 @@ class _EditorScreenState extends State<EditorScreen> {
                       }
                     });
                     Future.delayed(const Duration(milliseconds: 100), () {
-                      if (mounted) {
-                        setState(() => _isTyping = false);
-                        _updateCursorPosition();
-                      }
+                      if(mounted) setState(() => _isTyping = false);
+                      _updateCursorPosition();
                     });
                   },
                 ),
@@ -213,13 +406,13 @@ class _EditorScreenState extends State<EditorScreen> {
                     left: 0,
                     top: 0,
                     bottom: 0,
-                    width: 40,
+                    width: 45,
                     child: Container(
                       color: const Color(0xFF252526),
                       alignment: Alignment.topRight,
-                      padding: const EdgeInsets.only(right: 4, top: 8),
+                      padding: const EdgeInsets.only(right: 5, top: 8),
                       child: Text(
-                        List.generate(_totalLines > 0 ? _totalLines : 1, (i) => i + 1).join('\n'),
+                        List.generate(_totalLines, (i) => '${i + 1}\n').join(),
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: fontSize,
@@ -240,11 +433,17 @@ class _EditorScreenState extends State<EditorScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text("TERMINAL", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("TERMINAL", style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 12)),
+                      IconButton(icon: const Icon(Icons.close, size: 16, color: Colors.red), onPressed: _toggleTerminal)
+                    ],
+                  ),
                   Expanded(
                     child: SingleChildScrollView(
                       child: Text(
-                        "> Esperando comando...\n",
+                        "> Sistema listo...\n> Esperando comando...\n",
                         style: const TextStyle(color: Colors.greenAccent, fontFamily: 'monospace', fontSize: 12),
                       ),
                     ),
@@ -260,12 +459,12 @@ class _EditorScreenState extends State<EditorScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             const SizedBox(width: 8),
-            Text('Ln $_currentLine, Col $_currentColumn', style: const TextStyle(fontSize: 12)),
-            Text('Total: $_totalLines', style: const TextStyle(fontSize: 12)),
-            Text('Chars: ${_controller.text.length}', style: const TextStyle(fontSize: 12)),
-            Text(_wordWrap ? 'Wrap: ON' : 'Wrap: OFF', style: const TextStyle(fontSize: 12)),
-            Text('Zoom: ${(_zoomLevel * 100).toInt()}%', style: const TextStyle(fontSize: 12)),
-            Text(_encoding, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            Text('Ln $_currentLine, Col $_currentColumn', style: const TextStyle(fontSize: 11, color: Colors.white)),
+            Text('Total: $_totalLines', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+            Text('Chars: ${_controller.text.length}', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+            Text(_wordWrap ? 'Wrap: ON' : 'Wrap: OFF', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+            Text('Zoom: ${(_zoomLevel * 100).toInt()}%', style: const TextStyle(fontSize: 11, color: Colors.white70)),
+            Text(_encoding, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(width: 8),
           ],
         ),
@@ -273,287 +472,46 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  PopupMenuButton<String> _buildMenu(String title, List<PopupMenuEntry<String>> items) {
+  PopupMenuButton<String> _buildMenu(String title, List<MenuItem> items) {
     return PopupMenuButton<String>(
       tooltip: title,
+      icon: Icon(items.first.icon, color: Colors.white), // Usa el icono del primer item como referencia visual o podrías personalizarlo
       onSelected: (value) {
-        _handleMenuAction(value);
+        final item = items.firstWhere((i) => i.value == value, orElse: () => MenuItem('', Icons.error, () {}));
+        item.onTap();
       },
-      itemBuilder: (context) => items,
-    );
-  }
-
-  void _handleMenuAction(String value) {
-    switch (value) {
-      case 'nuevo':
-        _newFile();
-        break;
-      case 'abrir':
-        _openFile();
-        break;
-      case 'guardar':
-        _saveFile();
-        break;
-      case 'guardar_como':
-        _saveFileAs();
-        break;
-      case 'deshacer':
-        _undo();
-        break;
-      case 'rehacer':
-        _redo();
-        break;
-      case 'buscar':
-        _showSearchDialog();
-        break;
-      case 'ir_linea':
-        _goToLine();
-        break;
-      case 'seleccionar_todo':
-        _selectAll();
-        break;
-      case 'ajuste':
-        _toggleWordWrap();
-        break;
-      case 'numeros':
-        _toggleLineNumbers();
-        break;
-      case 'zoom_in':
-        _adjustZoom(0.1);
-        break;
-      case 'zoom_out':
-        _adjustZoom(-0.1);
-        break;
-      case 'terminal':
-        _toggleTerminal();
-        break;
-      case 'ejecutar':
-        _runCode();
-        break;
-      case 'sintaxis':
-        _checkSyntax();
-        break;
-    }
-  }
-
-  void _newFile() {
-    setState(() {
-      _controller.clear();
-      _currentFilePath = null;
-      _history.clear();
-      _historyIndex = -1;
-    });
-    _showMsg("Nuevo archivo creado");
-  }
-
-  Future<void> _openFile() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['txt', 'dart', 'js', 'py', 'java', 'cpp', 'c', 'h', 'html', 'css', 'json', 'xml', 'md'],
-      );
-
-      if (result != null && result.files.single.path != null) {
-        File file = File(result.files.single.path!);
-        String content = await file.readAsString();
-        
-        setState(() {
-          _controller.text = content;
-          _currentFilePath = result.files.single.path;
-          _history.clear();
-          _history.add(content);
-          _historyIndex = 0;
-        });
-        _showMsg("Archivo abierto: ${result.files.single.name}");
-        _savePreferences();
-      } else {
-        _showMsg("No se seleccionó ningún archivo");
-      }
-    } catch (e) {
-      _showMsg("Error al abrir archivo: $e");
-    }
-  }
-
-  Future<void> _saveFile() async {
-    if (_currentFilePath == null) {
-      await _saveFileAs();
-    } else {
-      try {
-        File file = File(_currentFilePath!);
-        await file.writeAsString(_controller.text);
-        _showMsg("Archivo guardado correctamente");
-        _savePreferences();
-      } catch (e) {
-        _showMsg("Error al guardar: $e");
-      }
-    }
-  }
-
-  Future<void> _saveFileAs() async {
-    try {
-      // Guardar en la carpeta Documents del dispositivo
-      Directory? directory = await getExternalStorageDirectory();
-      String newPath = "";
-      
-      if (directory != null) {
-        // Navegar hasta la carpeta Documents
-        List<String> paths = directory.path.split('/');
-        if (paths.length >= 5) {
-          newPath = paths.sublist(0, paths.length - 4).join('/') + '/Documents';
-        } else {
-          newPath = directory.path;
+      itemBuilder: (context) => items.map((item) {
+        if (item is DividerItem) {
+          return const PopupMenuDivider();
         }
-      } else {
-        // Fallback a directorio temporal si falla
-        directory = await getTemporaryDirectory();
-        newPath = directory.path;
-      }
-
-      // Crear nombre de archivo con timestamp
-      String fileName = "nota_${DateTime.now().millisecondsSinceEpoch}.txt";
-      String fullPath = "$newPath/$fileName";
-      
-      File file = File(fullPath);
-      await file.writeAsString(_controller.text);
-      
-      setState(() {
-        _currentFilePath = fullPath;
-      });
-      
-      _showMsg("Guardado en: $fullPath");
-      _savePreferences();
-    } catch (e) {
-      _showMsg("Error al guardar como: $e");
-    }
-  }
-
-  void _undo() {
-    if (_historyIndex > 0) {
-      _historyIndex--;
-      _controller.text = _history[_historyIndex];
-      _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
-    }
-  }
-
-  void _redo() {
-    if (_historyIndex < _history.length - 1) {
-      _historyIndex++;
-      _controller.text = _history[_historyIndex];
-      _controller.selection = TextSelection.fromPosition(TextPosition(offset: _controller.text.length));
-    }
-  }
-
-  void _showSearchDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Buscar"),
-        content: TextField(
-          decoration: const InputDecoration(hintText: "Texto a buscar..."),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelar"),
+        return PopupMenuItem<String>(
+          value: item.value,
+          child: Row(
+            children: [
+              Icon(item.icon, size: 20, color: Colors.blueGrey),
+              const SizedBox(width: 12),
+              Text(item.label),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              // Lógica de búsqueda simple
-              Navigator.pop(context);
-              _showMsg("Función de búsqueda completa en desarrollo");
-            },
-            child: const Text("Buscar"),
-          ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
+}
 
-  void _goToLine() {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Ir a Línea"),
-        content: TextField(
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: "Número de línea"),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancelar"),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _showMsg("Función Ir a Línea en desarrollo");
-            },
-            child: const Text("Ir"),
-          ),
-        ],
-      ),
-    );
-  }
+// Clases auxiliares para el menú
+abstract class MenuEntry {
+  final String label;
+  final IconData icon;
+  MenuEntry(this.label, this.icon);
+}
 
-  void _selectAll() {
-    _controller.selection = TextSelection(baseOffset: 0, extentOffset: _controller.text.length);
-    _showMsg("Todo el texto seleccionado");
-  }
+class MenuItem extends MenuEntry {
+  final String value;
+  final VoidCallback onTap;
+  MenuItem(String label, IconData icon, this.onTap) : super(label, icon), value = label;
+}
 
-  void _toggleWordWrap() {
-    setState(() => _wordWrap = !_wordWrap);
-    _savePreferences();
-    _showMsg(_wordWrap ? "Ajuste de línea activado" : "Ajuste de línea desactivado");
-  }
-
-  void _toggleLineNumbers() {
-    setState(() => _showLineNumbers = !_showLineNumbers);
-    _savePreferences();
-    _showMsg(_showLineNumbers ? "Números de línea visibles" : "Números de línea ocultos");
-  }
-
-  void _adjustZoom(double delta) {
-    setState(() {
-      _zoomLevel = ((_zoomLevel + delta).clamp(0.5, 2.0));
-    });
-    _savePreferences();
-    _showMsg("Zoom: ${(_zoomLevel * 100).toInt()}%");
-  }
-
-  void _toggleTerminal() {
-    setState(() => _terminalVisible = !_terminalVisible);
-  }
-
-  void _runCode() {
-    _showMsg("Ejecutando código simulado... (Requiere configuración de entorno)");
-  }
-
-  void _checkSyntax() {
-    int openP = 0;
-    int closeP = 0;
-    
-    // Contar paréntesis, llaves y corchetes
-    for (var char in '({['.split('')) {
-      openP += _controller.text.split(char).length - 1;
-    }
-    for (var char in ')}]'.split('')) {
-      closeP += _controller.text.split(char).length - 1;
-    }
-    
-    if (openP == closeP) {
-      _showMsg("Sintaxis correcta: Paréntesis balanceados");
-    } else {
-      _showMsg("Error de sintaxis: $openP apertura(s), $closeP cierre(s)");
-    }
-  }
-
-  void _showMsg(String msg) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(msg), duration: const Duration(seconds: 2)),
-      );
-    }
-  }
+class DividerItem extends MenuEntry {
+  DividerItem() : super('', Icons.error);
 }
