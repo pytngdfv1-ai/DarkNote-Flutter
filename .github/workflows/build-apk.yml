@@ -25,24 +25,22 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.19.0' # Versión estable conocida
+          flutter-version: '3.19.0'
+
+      - name: Generate Flutter Project Structure
+        # Este comando crea las carpetas android/, ios/, etc. si faltan
+        # Usamos --platforms=android para ahorrar tiempo y solo crear lo necesario
+        # Usamos --no-overwrite para no borrar tu pubspec.yaml o lib/main.dart
+        run: flutter create --platforms=android --no-overwrite .
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Create Android local properties (si no existe)
-        run: |
-          if [ ! -f android/local.properties ]; then
-            echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-          fi
+      - name: Create Android local properties
+        # Ahora sí existe la carpeta android/, así que esto funcionará
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
-
-      - name: Enable Android project (Genera archivos faltantes si es necesario)
-        run: |
-          # Esto asegura que la carpeta android/ esté correctamente configurada
-          # incluso si solo subimos pubspec.yaml y lib/main.dart
-          flutter create --platforms=android --no-overwrite . 
 
       - name: Build Debug APK
         run: flutter build apk --debug
