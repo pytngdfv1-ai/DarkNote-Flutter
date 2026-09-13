@@ -151,11 +151,10 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _saveFileAs() async {
     try {
-      // Usamos saveFile para abrir el selector nativo de "Guardar como"
       String? filePath = await FilePicker.platform.saveFile(
         dialogTitle: "Guardar archivo como...",
         fileName: _currentFileName == "Sin título" ? "nota_${DateTime.now().millisecondsSinceEpoch}.txt" : _currentFileName,
-        fileType: FileType.custom,
+        type: FileType.custom,
         allowedExtensions: ['txt', 'md', 'dart', 'js', 'html'],
       );
 
@@ -167,7 +166,8 @@ class _EditorScreenState extends State<EditorScreen> {
         await _writeToFile(filePath);
         setState(() {
           _currentFilePath = filePath;
-          _currentFileName = filePath.split('/').last;
+          // Manejo seguro para obtener el nombre del archivo
+          _currentFileName = filePath.split('/').last; 
         });
       } else {
         _showMsg("Guardado cancelado");
@@ -409,7 +409,8 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  PopupMenuButton<dynamic> _buildMenu(String title, List<PopupMenuItem<dynamic>> items) {
+  // CORRECCIÓN CLAVE: Usar List<dynamic> para permitir Dividers y Items mezclados
+  PopupMenuButton<dynamic> _buildMenu(String title, List<dynamic> items) {
     return PopupMenuButton<dynamic>(
       tooltip: title,
       icon: Icon(_getIconForMenu(title)),
