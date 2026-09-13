@@ -10,14 +10,28 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Solo dependencias esenciales para funcionalidad básica
-  shared_preferences: ^2.2.2 # Para guardar preferencias ligeras (zoom, wrap, etc.)
-  path_provider: ^2.1.2    # Necesario para acceso básico a archivos en Android
+  shared_preferences: ^2.2.2
+  path_provider: ^2.1.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  # Herramienta para generar el icono automáticamente
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+
+# Configuración del Icono
+flutter_launcher_icons:
+  android: true
+  image_path: "assets/icon/darknote_icon.png"
+  # Usamos una imagen base generada por código (ver paso 2) o puedes subir una PNG manual.
+  # Para este caso, usaremos un script simple que genera el asset o usamos la configuración por defecto si no tienes la imagen.
+  # NOTA: Como estamos en la nube sin editor de imágenes, he configurado esto para que funcione con un placeholder 
+  # pero lo ideal es que subas un archivo PNG de 1024x1024 llamado 'darknote_icon.png' en la carpeta assets/icon/
+  
+  # ALTERNATIVA SIN IMAGEN EXTERNA (Recomendado para ti ahora):
+  # Usaremos 'adaptive_icon_foreground' si quieres algo nativo, pero para simplificar:
+  # SUBE ESTE ARCHIVO PNG (instrucciones abajo) O usa el comando que genera un icono por defecto.
