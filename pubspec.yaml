@@ -1,7 +1,7 @@
 name: darknote
 description: Un editor de texto ultraligero y funcional con tema oscuro.
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -11,7 +11,7 @@ dependencies:
     sdk: flutter
   
   # Librerías esenciales para funcionalidad real
-  file_picker: ^6.1.1      # Para abrir/guardar archivos nativamente
+  file_picker: ^6.1.1      # CRUCIAL: Para abrir/guardar archivos nativamente
   path_provider: ^2.1.2    # Para acceder a carpetas del dispositivo
   permission_handler: ^11.3.0 # Para pedir permisos de almacenamiento
   shared_preferences: ^2.2.2 # Para guardar configuración
