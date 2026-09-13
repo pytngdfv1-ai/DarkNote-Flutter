@@ -1,7 +1,7 @@
 name: darknote
 description: Un editor de texto ultraligero y funcional con tema oscuro.
 publish_to: 'none'
-version: 1.0.0+4
+version: 1.0.0+5
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -10,11 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # Versiones específicas probadas para evitar errores de compilación
-  file_picker: ^5.5.0      
-  path_provider: ^2.1.2    
-  permission_handler: ^11.3.0 
-  shared_preferences: ^2.2.2 
+  # Versión específica estable para evitar errores de parámetros
+  file_picker: 5.3.1
+  path_provider: ^2.1.2
+  permission_handler: ^11.3.0
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -23,6 +23,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # Esto asegura que Flutter reconozca los recursos si agregamos assets manuales
-  # assets:
-  #   - assets/images/
