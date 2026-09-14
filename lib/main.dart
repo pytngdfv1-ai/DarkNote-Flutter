@@ -117,7 +117,7 @@ class _EditorScreenState extends State<EditorScreen> {
   Future<void> _openFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom, // Parámetro universal
+        type: FileType.custom,
         allowedExtensions: ['txt', 'md', 'dart', 'js', 'html', 'css', 'json', 'xml'],
       );
 
@@ -151,25 +151,24 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _saveFileAs() async {
     try {
-      // CORRECCIÓN: Usamos 'type' en lugar de 'fileType' para compatibilidad total
       String? filePath = await FilePicker.platform.saveFile(
         dialogTitle: "Guardar archivo como...",
         fileName: _currentFileName == "Sin título" ? "nota_${DateTime.now().millisecondsSinceEpoch}.txt" : _currentFileName,
-        type: FileType.custom, 
+        type: FileType.custom,
         allowedExtensions: ['txt', 'md', 'dart', 'js', 'html'],
       );
 
       if (filePath != null) {
-        // Asegurar extensión .txt si no tiene
         if (!filePath.endsWith('.txt') && !filePath.endsWith('.md')) {
            filePath = "$filePath.txt";
         }
         await _writeToFile(filePath);
         setState(() {
           _currentFilePath = filePath;
-          // CORRECCIÓN: Verificación de nulo antes de hacer split
+          // CORRECCIÓN CRÍTICA: filePath ya no es nullable aquí gracias al if
           _currentFileName = filePath.split('/').last; 
         });
+        _showMsg("Guardado en: $_currentFileName");
       } else {
         _showMsg("Guardado cancelado");
       }
@@ -182,7 +181,7 @@ class _EditorScreenState extends State<EditorScreen> {
     try {
       File file = File(path);
       await file.writeAsString(_controller.text);
-      _showMsg("Archivo guardado exitosamente en:\n$path");
+      _showMsg("Archivo guardado exitosamente.");
     } catch (e) {
       _showMsg("Fallo crítico al escribir: $e");
     }
@@ -417,7 +416,7 @@ class _EditorScreenState extends State<EditorScreen> {
       onSelected: (value) {
         // La acción se maneja dentro del item
       },
-      itemBuilder: (context) => items,
+      itemBuilder: (context) => items as List<PopupMenuEntry<dynamic>>,
     );
   }
 
