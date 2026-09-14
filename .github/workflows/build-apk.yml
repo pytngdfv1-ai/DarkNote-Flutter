@@ -24,27 +24,33 @@ jobs:
         with:
           channel: 'stable'
           flutter-version: '3.19.0'
+          cache: true
 
-      # Limpieza profunda para evitar conflictos de versiones
-      - name: Clean Project
+      # Limpieza segura: Elimina android y pubspec.lock si existen, sin fallar si no existen
+      - name: Clean Environment
         run: |
-          rm -rf android
-          rm pubspec.lock
+          rm -rf android || true
+          rm -f pubspec.lock || true
           flutter clean
 
+      # Regenera solo la parte de Android con el nombre correcto
       - name: Recreate Android Project
         run: flutter create --platforms=android --project-name darknote .
 
-      - name: Get dependencies
+      # Obtiene dependencias forzando la versión correcta de file_picker
+      - name: Get Dependencies
         run: flutter pub get
 
+      # Asegura que el Manifiesto tenga el paquete correcto
       - name: Fix Android Manifest
         run: |
           sed -i 's/package="com.example.darknote"/package="com.darknote.app"/g' android/app/src/main/AndroidManifest.xml
 
-      - name: Build Release APK (Split per ABI)
+      # Compilación Release dividida por arquitectura (más ligero)
+      - name: Build Release APK
         run: flutter build apk --release --split-per-abi
 
+      # Sube los APKs como artefactos
       - name: Upload APK Artifacts
         uses: actions/upload-artifact@v4
         with:
