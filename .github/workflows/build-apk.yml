@@ -3,8 +3,6 @@ name: Build DarkNote APK
 on:
   push:
     branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
   workflow_dispatch:
 
 jobs:
@@ -27,15 +25,24 @@ jobs:
           channel: 'stable'
           flutter-version: '3.19.0'
 
-      - name: Clean and Create Project Structure
+      # Limpieza profunda para evitar conflictos de versiones
+      - name: Clean Project
         run: |
           rm -rf android
-          flutter create --platforms=android --project-name darknote .
+          rm pubspec.lock
+          flutter clean
+
+      - name: Recreate Android Project
+        run: flutter create --platforms=android --project-name darknote .
 
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build Release APKs (Split per ABI)
+      - name: Fix Android Manifest
+        run: |
+          sed -i 's/package="com.example.darknote"/package="com.darknote.app"/g' android/app/src/main/AndroidManifest.xml
+
+      - name: Build Release APK (Split per ABI)
         run: flutter build apk --release --split-per-abi
 
       - name: Upload APK Artifacts
