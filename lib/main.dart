@@ -154,19 +154,19 @@ class _EditorScreenState extends State<EditorScreen> {
       String? filePath = await FilePicker.platform.saveFile(
         dialogTitle: "Guardar archivo como...",
         fileName: _currentFileName == "Sin título" ? "nota_${DateTime.now().millisecondsSinceEpoch}.txt" : _currentFileName,
-        type: FileType.custom,
+        fileType: FileType.custom,
         allowedExtensions: ['txt', 'md', 'dart', 'js', 'html'],
       );
 
       if (filePath != null) {
-        // Asegurar extensión .txt si no tiene
+        // CORRECCIÓN: Verificar nulidad antes de usar split
         if (!filePath.endsWith('.txt') && !filePath.endsWith('.md')) {
            filePath = "$filePath.txt";
         }
         await _writeToFile(filePath);
         setState(() {
           _currentFilePath = filePath;
-          // Manejo seguro para obtener el nombre del archivo
+          // CORRECCIÓN: Usar operador null-aware si fuera necesario, aunque filePath ya no es null aquí
           _currentFileName = filePath.split('/').last; 
         });
       } else {
@@ -394,7 +394,7 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  // Helper para crear items de menú correctamente tipados
+  // CORRECCIÓN: Tipado explícito para PopupMenuItem
   PopupMenuItem<dynamic> _menuItem(String label, IconData icon, VoidCallback onTap) {
     return PopupMenuItem<dynamic>(
       value: label,
@@ -409,8 +409,8 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  // CORRECCIÓN CLAVE: Usar List<dynamic> para permitir Dividers y Items mezclados
-  PopupMenuButton<dynamic> _buildMenu(String title, List<dynamic> items) {
+  // CORRECCIÓN: Usar List<PopupMenuEntry<dynamic>> explícitamente
+  PopupMenuButton<dynamic> _buildMenu(String title, List<PopupMenuEntry<dynamic>> items) {
     return PopupMenuButton<dynamic>(
       tooltip: title,
       icon: Icon(_getIconForMenu(title)),
