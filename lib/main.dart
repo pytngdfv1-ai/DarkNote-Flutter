@@ -392,19 +392,8 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  // CORRECCIÓN CLAVE: Usamos List<Widget> para permitir PopupMenuItem y PopupMenuDivider
-  PopupMenuButton<dynamic> _buildMenu(String title, List<Widget> items) {
-    return PopupMenuButton<dynamic>(
-      tooltip: title,
-      icon: Icon(_getIconForMenu(title)),
-      onSelected: (value) {
-        // La acción se maneja dentro del item
-      },
-      itemBuilder: (context) => items,
-    );
-  }
-
-  PopupMenuItem<dynamic> _menuItem(String label, IconData icon, VoidCallback onTap) {
+  // CORRECCIÓN CLAVE: Usar PopupMenuEntry<dynamic> en lugar de Widget o dynamic
+  PopupMenuEntry<dynamic> _menuItem(String label, IconData icon, VoidCallback onTap) {
     return PopupMenuItem<dynamic>(
       value: label,
       child: ListTile(
@@ -415,6 +404,18 @@ class _EditorScreenState extends State<EditorScreen> {
         minLeadingWidth: 24,
       ),
       onTap: onTap,
+    );
+  }
+
+  // CORRECCIÓN CLAVE: La lista debe ser de tipo PopupMenuEntry<dynamic>
+  PopupMenuButton<dynamic> _buildMenu(String title, List<PopupMenuEntry<dynamic>> items) {
+    return PopupMenuButton<dynamic>(
+      tooltip: title,
+      icon: Icon(_getIconForMenu(title)),
+      onSelected: (value) {
+        // La acción se maneja dentro del item
+      },
+      itemBuilder: (context) => items,
     );
   }
 
