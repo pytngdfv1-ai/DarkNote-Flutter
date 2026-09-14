@@ -151,6 +151,7 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _saveFileAs() async {
     try {
+      // Usamos saveFile para abrir el selector nativo de "Guardar como"
       String? filePath = await FilePicker.platform.saveFile(
         dialogTitle: "Guardar archivo como...",
         fileName: _currentFileName == "Sin título" ? "nota_${DateTime.now().millisecondsSinceEpoch}.txt" : _currentFileName,
@@ -159,16 +160,16 @@ class _EditorScreenState extends State<EditorScreen> {
       );
 
       if (filePath != null) {
+        // Asegurar extensión .txt si no tiene
         if (!filePath.endsWith('.txt') && !filePath.endsWith('.md')) {
            filePath = "$filePath.txt";
         }
         await _writeToFile(filePath);
         setState(() {
           _currentFilePath = filePath;
-          // CORRECCIÓN CRÍTICA: filePath ya no es nullable aquí gracias al if
-          _currentFileName = filePath.split('/').last; 
+          // CORRECCIÓN AQUÍ: Uso de ! porque ya verificamos que filePath != null
+          _currentFileName = filePath!.split('/').last; 
         });
-        _showMsg("Guardado en: $_currentFileName");
       } else {
         _showMsg("Guardado cancelado");
       }
@@ -181,7 +182,7 @@ class _EditorScreenState extends State<EditorScreen> {
     try {
       File file = File(path);
       await file.writeAsString(_controller.text);
-      _showMsg("Archivo guardado exitosamente.");
+      _showMsg("Archivo guardado exitosamente en:\n$path");
     } catch (e) {
       _showMsg("Fallo crítico al escribir: $e");
     }
@@ -409,14 +410,14 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  PopupMenuButton<dynamic> _buildMenu(String title, List<dynamic> items) {
+  PopupMenuButton<dynamic> _buildMenu(String title, List<PopupMenuItem<dynamic>> items) {
     return PopupMenuButton<dynamic>(
       tooltip: title,
       icon: Icon(_getIconForMenu(title)),
       onSelected: (value) {
         // La acción se maneja dentro del item
       },
-      itemBuilder: (context) => items as List<PopupMenuEntry<dynamic>>,
+      itemBuilder: (context) => items,
     );
   }
 
