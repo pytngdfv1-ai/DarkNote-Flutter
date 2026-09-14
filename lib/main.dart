@@ -117,7 +117,7 @@ class _EditorScreenState extends State<EditorScreen> {
   Future<void> _openFile() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
+        type: FileType.custom, // Parámetro universal
         allowedExtensions: ['txt', 'md', 'dart', 'js', 'html', 'css', 'json', 'xml'],
       );
 
@@ -151,22 +151,23 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _saveFileAs() async {
     try {
+      // CORRECCIÓN: Usamos 'type' en lugar de 'fileType' para compatibilidad total
       String? filePath = await FilePicker.platform.saveFile(
         dialogTitle: "Guardar archivo como...",
         fileName: _currentFileName == "Sin título" ? "nota_${DateTime.now().millisecondsSinceEpoch}.txt" : _currentFileName,
-        fileType: FileType.custom,
+        type: FileType.custom, 
         allowedExtensions: ['txt', 'md', 'dart', 'js', 'html'],
       );
 
       if (filePath != null) {
-        // CORRECCIÓN: Verificar nulidad antes de usar split
+        // Asegurar extensión .txt si no tiene
         if (!filePath.endsWith('.txt') && !filePath.endsWith('.md')) {
            filePath = "$filePath.txt";
         }
         await _writeToFile(filePath);
         setState(() {
           _currentFilePath = filePath;
-          // CORRECCIÓN: Usar operador null-aware si fuera necesario, aunque filePath ya no es null aquí
+          // CORRECCIÓN: Verificación de nulo antes de hacer split
           _currentFileName = filePath.split('/').last; 
         });
       } else {
@@ -394,7 +395,7 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  // CORRECCIÓN: Tipado explícito para PopupMenuItem
+  // Helper para crear items de menú correctamente tipados
   PopupMenuItem<dynamic> _menuItem(String label, IconData icon, VoidCallback onTap) {
     return PopupMenuItem<dynamic>(
       value: label,
@@ -409,8 +410,7 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  // CORRECCIÓN: Usar List<PopupMenuEntry<dynamic>> explícitamente
-  PopupMenuButton<dynamic> _buildMenu(String title, List<PopupMenuEntry<dynamic>> items) {
+  PopupMenuButton<dynamic> _buildMenu(String title, List<dynamic> items) {
     return PopupMenuButton<dynamic>(
       tooltip: title,
       icon: Icon(_getIconForMenu(title)),
