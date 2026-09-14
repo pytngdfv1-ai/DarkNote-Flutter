@@ -151,7 +151,6 @@ class _EditorScreenState extends State<EditorScreen> {
 
   Future<void> _saveFileAs() async {
     try {
-      // Usamos saveFile para abrir el selector nativo de "Guardar como"
       String? filePath = await FilePicker.platform.saveFile(
         dialogTitle: "Guardar archivo como...",
         fileName: _currentFileName == "Sin título" ? "nota_${DateTime.now().millisecondsSinceEpoch}.txt" : _currentFileName,
@@ -160,14 +159,12 @@ class _EditorScreenState extends State<EditorScreen> {
       );
 
       if (filePath != null) {
-        // Asegurar extensión .txt si no tiene
         if (!filePath.endsWith('.txt') && !filePath.endsWith('.md')) {
            filePath = "$filePath.txt";
         }
         await _writeToFile(filePath);
         setState(() {
           _currentFilePath = filePath;
-          // CORRECCIÓN AQUÍ: Uso de ! porque ya verificamos que filePath != null
           _currentFileName = filePath!.split('/').last; 
         });
       } else {
@@ -395,7 +392,18 @@ class _EditorScreenState extends State<EditorScreen> {
     );
   }
 
-  // Helper para crear items de menú correctamente tipados
+  // CORRECCIÓN CLAVE: Usamos List<Widget> para permitir PopupMenuItem y PopupMenuDivider
+  PopupMenuButton<dynamic> _buildMenu(String title, List<Widget> items) {
+    return PopupMenuButton<dynamic>(
+      tooltip: title,
+      icon: Icon(_getIconForMenu(title)),
+      onSelected: (value) {
+        // La acción se maneja dentro del item
+      },
+      itemBuilder: (context) => items,
+    );
+  }
+
   PopupMenuItem<dynamic> _menuItem(String label, IconData icon, VoidCallback onTap) {
     return PopupMenuItem<dynamic>(
       value: label,
@@ -407,17 +415,6 @@ class _EditorScreenState extends State<EditorScreen> {
         minLeadingWidth: 24,
       ),
       onTap: onTap,
-    );
-  }
-
-  PopupMenuButton<dynamic> _buildMenu(String title, List<PopupMenuItem<dynamic>> items) {
-    return PopupMenuButton<dynamic>(
-      tooltip: title,
-      icon: Icon(_getIconForMenu(title)),
-      onSelected: (value) {
-        // La acción se maneja dentro del item
-      },
-      itemBuilder: (context) => items,
     );
   }
 
